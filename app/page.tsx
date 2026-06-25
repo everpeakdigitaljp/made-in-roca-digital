@@ -728,6 +728,52 @@ function FloatingWhatsApp() {
   );
 }
 
+const NAV_LINKS = [
+  { label: "Nossa História", href: "#historia" },
+  { label: "Produtos", href: "#produtos" },
+  { label: "Como Pedir", href: "#como-pedir" },
+  { label: "Depoimentos", href: "#depoimentos" },
+  { label: "Contato", href: "#contato" },
+] as const;
+
+function SiteHeader() {
+  return (
+    <header className="sticky top-0 z-50 border-b border-[#8b451f]/10 bg-[#fff8ed]/95 backdrop-blur-sm">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-5 sm:h-[4.5rem] sm:gap-6">
+        <a
+          href="#"
+          className="shrink-0 transition opacity-95 hover:opacity-100"
+          aria-label="Made in Roça — início"
+        >
+          <LogoImage size="sm" />
+        </a>
+
+        <nav
+          className="hidden items-center gap-0.5 lg:flex"
+          aria-label="Menu principal"
+        >
+          {NAV_LINKS.map((link) => (
+            <a
+              key={link.href}
+              href={link.href}
+              className="rounded-full px-3 py-2 text-sm font-medium text-[#8b451f] transition hover:bg-[#2f5d2f]/5 hover:text-[#2f5d2f]"
+            >
+              {link.label}
+            </a>
+          ))}
+        </nav>
+
+        <a
+          href="#produtos"
+          className="shrink-0 rounded-full bg-[#2f5d2f] px-4 py-2.5 text-xs font-semibold text-white shadow-sm shadow-[#2f5d2f]/15 transition hover:bg-[#264d26] hover:shadow-md active:scale-[0.98] sm:px-5 sm:py-2.5 sm:text-sm"
+        >
+          Ver Produtos
+        </a>
+      </div>
+    </header>
+  );
+}
+
 /* ─── Page ────────────────────────────────────────────────── */
 
 export default function Home() {
@@ -838,6 +884,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#fff8ed] text-[#2f5d2f]">
+      <SiteHeader />
+
       {/* ── Seção 1: Hero Premium ── */}
       <section className="relative flex min-h-[92vh] items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
@@ -889,7 +937,7 @@ export default function Home() {
       </section>
 
       {/* ── Seção 2: Nossa História ── */}
-      <section className="px-5 py-16 sm:py-24">
+      <section id="historia" className="scroll-mt-20 px-5 py-16 sm:py-24">
         <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-2 lg:gap-16">
           <div className="lg:text-left">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#d4af37] sm:text-sm">
@@ -926,7 +974,7 @@ export default function Home() {
       </section>
 
       {/* ── Seção 3: Produtos + Carrinho ── */}
-      <section id="produtos" className="bg-white px-5 py-16 sm:py-24">
+      <section id="produtos" className="scroll-mt-20 bg-white px-5 py-16 sm:py-24">
         <div className="mx-auto max-w-6xl">
           <SectionHeading
             label="Cardápio"
@@ -1024,7 +1072,7 @@ export default function Home() {
       </section>
 
       {/* ── Seção 5: Como Pedir ── */}
-      <section className="bg-[#2f5d2f] px-5 py-16 sm:py-24">
+      <section id="como-pedir" className="scroll-mt-20 bg-[#2f5d2f] px-5 py-16 sm:py-24">
         <div className="mx-auto max-w-6xl">
           <div className="mb-10 text-center sm:mb-14">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#d4af37] sm:text-sm">
@@ -1060,7 +1108,7 @@ export default function Home() {
       </section>
 
       {/* ── Seção 6: Depoimentos ── */}
-      <section className="px-5 py-16 sm:py-24">
+      <section id="depoimentos" className="scroll-mt-20 px-5 py-16 sm:py-24">
         <div className="mx-auto max-w-6xl">
           <SectionHeading
             label="Clientes"
@@ -1116,7 +1164,7 @@ export default function Home() {
       </section>
 
       {/* ── Seção 9: Rodapé ── */}
-      <footer className="border-t border-[#fff8ed]/10 bg-[#2f5d2f] px-5 py-12 text-[#fff8ed]">
+      <footer id="contato" className="scroll-mt-20 border-t border-[#fff8ed]/10 bg-[#2f5d2f] px-5 py-12 text-[#fff8ed]">
         <div className="mx-auto max-w-6xl text-center">
           <LogoImage size="sm" className="mx-auto" />
 
