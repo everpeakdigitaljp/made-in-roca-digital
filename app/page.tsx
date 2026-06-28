@@ -1,7 +1,26 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
+import { Toaster } from "@/components/ui/sonner";
 
 /* ─── Constants ─────────────────────────────────────────── */
 
@@ -12,6 +31,29 @@ const INSTAGRAM_URL = "https://instagram.com/madeinroca.jp";
 
 const WHATSAPP_DOUBT_MESSAGE = "Olá Made in Roça! Gostaria de tirar uma dúvida.";
 const WHATSAPP_DOUBT_LINK = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_DOUBT_MESSAGE)}`;
+
+const IMAGES = {
+  logo: "/images/branding/logo-made-in-roca.png",
+  badge: "/images/branding/badge.png",
+  placaMadeira: "/images/branding/placa de madeira.png",
+  gelato: "/images/gelatos/gelato1.jpg",
+  porcoNaLata: "/images/porco-na-lata/porco-na-lata1.jpg",
+  torresmo: "/images/torresmo/torresmo1.jpg",
+  doceLeite: {
+    tradicional: "/images/doce-leite/doce-leite-tradicional.png",
+    coco: "/images/doce-leite/doce-leite-coco.png",
+    pacoca: "/images/doce-leite/doce-leite-paçoca.png",
+    ameixa: "/images/doce-leite/doce-leite-ameixa.png",
+  },
+} as const;
+
+/** Imagem por sabor — Doce de Leite Artesanal */
+const DOCE_LEITE_VARIANT_IMAGES: Record<string, string> = {
+  Tradicional: IMAGES.doceLeite.tradicional,
+  Coco: IMAGES.doceLeite.coco,
+  Paçoca: IMAGES.doceLeite.pacoca,
+  Ameixa: IMAGES.doceLeite.ameixa,
+};
 
 /* ─── Carrinho: tipos e funções ─────────────────────────── */
 
@@ -58,7 +100,7 @@ const productCategories = [
     products: [
       {
         name: "Doce de Leite Artesanal",
-        image: "/images/doce-leite1.jpg",
+        image: IMAGES.doceLeite.tradicional,
         description:
           "Cremoso e delicado, cozido lentamente no tacho de cobre. O sabor autêntico da roça brasileira.",
         variants: [
@@ -77,7 +119,7 @@ const productCategories = [
     products: [
       {
         name: "Gelato Artesanal",
-        image: "/images/gelato1.jpg",
+        image: IMAGES.gelato,
         description:
           "Gelato cremoso com sabores brasileiros. Produzido em pequenos lotes, com ingredientes naturais.",
         variants: [
@@ -98,7 +140,7 @@ const productCategories = [
     products: [
       {
         name: "Porco na Lata",
-        image: "/images/porco-na-lata1.jpg",
+        image: IMAGES.porcoNaLata,
         description:
           "Conserva artesanal de carne suína desfiada, temperada com especiarias caipiras.",
         variants: [{ name: "Tradicional", priceYen: 1800 }],
@@ -106,7 +148,7 @@ const productCategories = [
       },
       {
         name: "Torresmo Caipira",
-        image: "/images/torresmo1.jpg",
+        image: IMAGES.torresmo,
         description:
           "Torresmo crocante feito na panela de ferro, com sal grosso e tempero de fazenda.",
         variants: [{ name: "Semi pronto congelado", priceYen: 900 }],
@@ -115,6 +157,52 @@ const productCategories = [
     ],
   },
 ] as const;
+
+type CatalogProduct = (typeof productCategories)[number]["products"][number];
+
+function getCatalogProduct(productName: string): CatalogProduct | undefined {
+  for (const category of productCategories) {
+    const product = category.products.find((item) => item.name === productName);
+    if (product) return product;
+  }
+  return undefined;
+}
+
+const DOCE_LEITE_EXPERIENCE = {
+  story:
+    "Cozido lentamente no tacho de cobre, como nas fazendas do interior. Cada pote guarda o sabor acolhedor da infância e a tradição da roça brasileira.",
+} as const;
+
+type ProductModalMeta = {
+  story?: string;
+  variantImages?: Record<string, string>;
+};
+
+const PRODUCT_MODAL_META: Record<string, ProductModalMeta> = {
+  "Doce de Leite Artesanal": {
+    story: DOCE_LEITE_EXPERIENCE.story,
+    variantImages: DOCE_LEITE_VARIANT_IMAGES,
+  },
+};
+
+function getStartingPrice(
+  variants: readonly ProductVariant[],
+  sizes: readonly ProductSizeOption[],
+) {
+  return Math.min(
+    ...variants.flatMap((variant) =>
+      sizes.map((size) => resolveItemPrice(variant, size)),
+    ),
+  );
+}
+
+function resolveVariantImage(
+  defaultImage: string,
+  variantName: string,
+  variantImages?: Record<string, string>,
+) {
+  return variantImages?.[variantName] ?? defaultImage;
+}
 
 /* ─── WhatsApp: mensagem agrupada por produto ───────────── */
 
@@ -179,7 +267,7 @@ function formatProductGroup(productName: string, items: CartItem[]) {
   return `${emoji} ${productName}\n\n${lines}\n\nSubtotal: ${formatYen(groupSubtotal)}`;
 }
 
-function buildWhatsAppOrderMessage(cart: CartItem[]) {
+function buildWhatsAppOrderMessage(cart: CartItem[], notes?: string) {
   const groupsText = groupCartByProduct(cart)
     .map(([productName, items]) => formatProductGroup(productName, items))
     .join("\n\n");
@@ -189,16 +277,31 @@ function buildWhatsAppOrderMessage(cart: CartItem[]) {
     0,
   );
 
+  const trimmedNotes = notes?.trim();
+  const notesBlock = trimmedNotes
+    ? `\n\nObservações:\n${trimmedNotes}`
+    : "";
+
   return `Olá Made in Roça!
 Gostaria de fazer este pedido:
 
 ${groupsText}
 
-Total: ${formatYen(total)}`;
+Total: ${formatYen(total)}${notesBlock}`;
 }
 
-function createCartWhatsAppLink(cart: CartItem[]) {
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(buildWhatsAppOrderMessage(cart))}`;
+function createCartWhatsAppLink(cart: CartItem[], notes?: string) {
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(buildWhatsAppOrderMessage(cart, notes))}`;
+}
+
+function getProductImageForCartItem(item: CartItem) {
+  const product = getCatalogProduct(item.name);
+  if (!product) return IMAGES.logo;
+  return resolveVariantImage(
+    product.image,
+    item.variant,
+    PRODUCT_MODAL_META[item.name]?.variantImages,
+  );
 }
 
 const flavors = [
@@ -327,119 +430,31 @@ function QuantitySelector({
   min?: number;
 }) {
   return (
-    <div className="flex items-center overflow-hidden rounded-full border border-[#8b451f]/20 bg-[#fff8ed]">
-      <button
+    <div className="flex items-center overflow-hidden rounded-full border border-border bg-background">
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
         onClick={onDecrease}
         disabled={quantity <= min}
         aria-label="Diminuir quantidade"
-        className="flex h-9 w-9 items-center justify-center text-lg font-bold text-[#2f5d2f] transition hover:bg-[#8b451f]/10 disabled:cursor-not-allowed disabled:opacity-40"
+        className="size-9 rounded-none text-lg sm:size-10"
       >
         −
-      </button>
-      <span className="min-w-9 text-center text-sm font-bold text-[#2f5d2f]">
+      </Button>
+      <span className="min-w-9 text-center text-sm font-bold text-foreground sm:min-w-10 sm:text-base">
         {quantity}
       </span>
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
         onClick={onIncrease}
         aria-label="Aumentar quantidade"
-        className="flex h-9 w-9 items-center justify-center text-lg font-bold text-[#2f5d2f] transition hover:bg-[#8b451f]/10"
+        className="size-9 rounded-none text-lg sm:size-10"
       >
         +
-      </button>
-    </div>
-  );
-}
-
-function VariantSelector({
-  variants,
-  selected,
-  onSelect,
-}: {
-  variants: readonly ProductVariant[];
-  selected: string;
-  onSelect: (variantName: string) => void;
-}) {
-  const useSelectOnMobile = variants.length > 4;
-
-  return (
-    <div className="mt-4">
-      <p className="mb-2 text-sm font-medium text-[#8b451f]">
-        Escolha o sabor:
-      </p>
-
-      {/* Select no mobile quando há muitos sabores (ex: Gelato) */}
-      {useSelectOnMobile && (
-        <select
-          value={selected}
-          onChange={(event) => onSelect(event.target.value)}
-          className="w-full rounded-full border border-[#8b451f]/20 bg-[#fff8ed] px-4 py-2.5 text-sm font-medium text-[#2f5d2f] outline-none focus:border-[#2f5d2f] sm:hidden"
-        >
-          {variants.map((variant) => (
-            <option key={variant.name} value={variant.name}>
-              {variant.name} — {formatYen(variant.priceYen)}
-            </option>
-          ))}
-        </select>
-      )}
-
-      {/* Botões arredondados — sempre visíveis, ou só desktop se muitos sabores */}
-      <div
-        className={`flex flex-wrap gap-2 ${useSelectOnMobile ? "hidden sm:flex" : "flex"}`}
-      >
-        {variants.map((variant) => (
-          <button
-            key={variant.name}
-            type="button"
-            onClick={() => onSelect(variant.name)}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
-              selected === variant.name
-                ? "bg-[#2f5d2f] text-[#fff8ed] shadow-sm"
-                : "border border-[#8b451f]/20 bg-[#fff8ed] text-[#2f5d2f] hover:border-[#8b451f]/40"
-            }`}
-          >
-            {variant.name}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SizeSelector({
-  sizes,
-  selected,
-  onSelect,
-  getPriceLabel,
-}: {
-  sizes: readonly ProductSizeOption[];
-  selected: string;
-  onSelect: (sizeLabel: string) => void;
-  getPriceLabel?: (size: ProductSizeOption) => string;
-}) {
-  return (
-    <div className="mt-4">
-      <p className="mb-2 text-sm font-medium text-[#8b451f]">
-        Escolha o tamanho:
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {sizes.map((size) => (
-          <button
-            key={size.label}
-            type="button"
-            onClick={() => onSelect(size.label)}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
-              selected === size.label
-                ? "bg-[#8b451f] text-[#fff8ed] shadow-sm"
-                : "border border-[#8b451f]/20 bg-[#fff8ed] text-[#2f5d2f] hover:border-[#8b451f]/40"
-            }`}
-          >
-            {size.label}
-            {getPriceLabel ? ` — ${getPriceLabel(size)}` : ""}
-          </button>
-        ))}
-      </div>
+      </Button>
     </div>
   );
 }
@@ -461,7 +476,7 @@ function LogoImage({
       className={`inline-block overflow-hidden rounded-2xl bg-[#fff8ed] p-2 shadow-md sm:p-3 ${className}`}
     >
       <Image
-        src="/images/logo-made-in-roca.png"
+        src={IMAGES.logo}
         alt="Made in Roça"
         width={512}
         height={512}
@@ -473,21 +488,90 @@ function LogoImage({
   );
 }
 
+const EMPTY_BASKET_MESSAGE = "Sua cestinha tá esperando um trem bão.";
+
 function ProductCard({
   name,
   image,
   description,
   variants,
   sizes,
-  selectedVariant,
-  selectedSize,
-  onVariantChange,
-  onSizeChange,
-  onAddToCart,
+  onOpenOptions,
 }: {
   name: string;
   image: string;
   description: string;
+  variants: readonly ProductVariant[];
+  sizes: readonly ProductSizeOption[];
+  onOpenOptions: () => void;
+}) {
+  const startingPrice = getStartingPrice(variants, sizes);
+
+  return (
+    <Card className="group transition duration-300 hover:border-accent/30 hover:shadow-xl hover:shadow-primary/10">
+      <div className="relative aspect-[4/3] overflow-hidden bg-background sm:aspect-[16/10]">
+        <Image
+          src={image}
+          alt={name}
+          width={960}
+          height={600}
+          className="size-full object-cover transition duration-500 group-hover:scale-[1.02]"
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 80vw, 50vw"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-primary/40 via-transparent to-transparent" />
+      </div>
+
+      <CardContent className="space-y-4">
+        <CardTitle>{name}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+
+        <div className="space-y-2.5">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-xs">
+              Sabores disponíveis
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {variants.map((variant) => (
+                <Badge key={variant.name} variant="outline">
+                  {variant.name}
+                </Badge>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-xs">
+              Tamanhos disponíveis
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {sizes.map((size) => (
+                <Badge key={size.label} variant="muted">
+                  {size.label}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <p className="font-serif text-xl font-bold text-foreground sm:text-2xl">
+          A partir de {formatYen(startingPrice)}
+        </p>
+      </CardContent>
+
+      <CardFooter className="w-full">
+        <Button className="w-full" size="lg" onClick={onOpenOptions}>
+          Escolher
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
+type ProductDrawerProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  name: string;
+  image: string;
+  variantImages?: Record<string, string>;
   variants: readonly ProductVariant[];
   sizes: readonly ProductSizeOption[];
   selectedVariant: string;
@@ -501,100 +585,150 @@ function ProductCard({
     priceYen: number,
     quantity: number,
   ) => void;
-}) {
+};
+
+function ProductDrawer({
+  open,
+  onOpenChange,
+  name,
+  image,
+  variantImages,
+  variants,
+  sizes,
+  selectedVariant,
+  selectedSize,
+  onVariantChange,
+  onSizeChange,
+  onAddToCart,
+}: ProductDrawerProps) {
   const [quantity, setQuantity] = useState(1);
-  const [addedFeedback, setAddedFeedback] = useState(false);
 
   const activeVariant =
     variants.find((variant) => variant.name === selectedVariant) ?? variants[0];
   const activeSize =
     sizes.find((size) => size.label === selectedSize) ?? sizes[0];
-  const activePrice = resolveItemPrice(activeVariant, activeSize);
+  const unitPrice = resolveItemPrice(activeVariant, activeSize);
+  const activeImage = resolveVariantImage(
+    image,
+    activeVariant.name,
+    variantImages,
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    setQuantity(1);
+  }, [open, name]);
 
   function handleAddToCart() {
     onAddToCart(
       name,
       activeVariant.name,
       activeSize.label,
-      activePrice,
+      unitPrice,
       quantity,
     );
-    setAddedFeedback(true);
-    setTimeout(() => setAddedFeedback(false), 2500);
+    setQuantity(1);
+    toast("🌾 Prontim! Esse trem já tá guardado na sua cestinha.");
   }
 
   return (
-    <article className="group overflow-hidden rounded-2xl border border-[#8b451f]/10 bg-white shadow-sm shadow-[#8b451f]/5 transition duration-300 hover:-translate-y-1 hover:border-[#d4af37]/30 hover:shadow-xl hover:shadow-[#8b451f]/10">
-      <div className="relative aspect-[4/3] overflow-hidden bg-[#fff8ed]">
-        <Image
-          src={image}
-          alt={name}
-          width={800}
-          height={600}
-          className="size-full object-cover transition duration-500 group-hover:scale-105"
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#2f5d2f]/30 via-transparent to-transparent" />
-        <span className="absolute bottom-3 right-3 rounded-full bg-[#fff8ed]/95 px-4 py-1.5 text-sm font-bold text-[#8b451f] shadow-sm backdrop-blur-sm">
-          {formatYen(activePrice)}
-        </span>
-      </div>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="flex max-h-[94dvh] flex-col gap-0 p-0">
+        <SheetTitle className="sr-only">{name}</SheetTitle>
 
-      <div className="p-5 sm:p-6">
-        <h3 className="font-serif text-xl font-bold text-[#2f5d2f]">{name}</h3>
-        <p className="mt-2 text-sm leading-relaxed text-[#8b451f]/85 sm:text-base">
-          {description}
-        </p>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="relative h-56 w-full shrink-0 overflow-hidden sm:h-60">
+            <Image
+              key={activeImage}
+              src={activeImage}
+              alt={`${name} — ${activeVariant.name}`}
+              width={960}
+              height={1200}
+              className="size-full object-cover object-center transition-opacity duration-300"
+              sizes="100vw"
+            />
+          </div>
 
-        <VariantSelector
-          variants={variants}
-          selected={selectedVariant}
-          onSelect={onVariantChange}
-        />
+          <div className="space-y-3 px-4 pb-4 pt-3 sm:px-5">
+            <div>
+              <p className="mb-1.5 text-xs font-semibold text-muted-foreground sm:text-sm">
+                Qual sabor ocê vai levá?
+              </p>
+              <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                {variants.map((variant) => (
+                  <Button
+                    key={variant.name}
+                    type="button"
+                    variant={
+                      selectedVariant === variant.name ? "chipActive" : "chip"
+                    }
+                    size="chip"
+                    onClick={() => onVariantChange(variant.name)}
+                  >
+                    {variant.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
 
-        <SizeSelector
-          sizes={sizes}
-          selected={selectedSize}
-          onSelect={onSizeChange}
-          getPriceLabel={(size) =>
-            formatYen(resolveItemPrice(activeVariant, size))
-          }
-        />
+            <div>
+              <p className="mb-1.5 text-xs font-semibold text-muted-foreground sm:text-sm">
+                Escolha o tamanhim
+              </p>
+              <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                {sizes.map((size) => (
+                  <Button
+                    key={size.label}
+                    type="button"
+                    variant={
+                      selectedSize === size.label ? "chipSizeActive" : "chip"
+                    }
+                    size="chip"
+                    onClick={() => onSizeChange(size.label)}
+                  >
+                    {size.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
 
-        <div className="mt-5 flex flex-wrap items-center gap-4">
-          <span className="text-sm font-medium text-[#8b451f]">Quantidade</span>
-          <QuantitySelector
-            quantity={quantity}
-            onDecrease={() => setQuantity((q) => Math.max(1, q - 1))}
-            onIncrease={() => setQuantity((q) => q + 1)}
-          />
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 p-3">
+              <span className="text-xs font-semibold text-muted-foreground sm:text-sm">
+                Quantos vai levá?
+              </span>
+              <QuantitySelector
+                quantity={quantity}
+                onDecrease={() => setQuantity((q) => Math.max(1, q - 1))}
+                onIncrease={() => setQuantity((q) => q + 1)}
+              />
+            </div>
+          </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleAddToCart}
-          className="mt-5 w-full rounded-full bg-[#8b451f] px-6 py-3 text-sm font-semibold text-[#fff8ed] shadow-md shadow-[#8b451f]/20 transition hover:bg-[#723a1a] active:scale-[0.98] sm:w-auto"
-        >
-          Adicionar ao pedido
-        </button>
-
-        {addedFeedback && (
-          <p className="mt-3 text-sm font-medium text-[#2f5d2f]">
-            ✓ Produto adicionado ao pedido
-          </p>
-        )}
-      </div>
-    </article>
+        <SheetFooter>
+          <Button className="w-full" size="lg" onClick={handleAddToCart}>
+            🧺 Guardar na Cestinha
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
-// Painel lateral com resumo do carrinho
-function CartPanel({
+function CartDrawer({
+  open,
+  onOpenChange,
   cart,
+  orderNotes,
+  onOrderNotesChange,
   onUpdateQuantity,
   onRemove,
 }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   cart: CartItem[];
+  orderNotes: string;
+  onOrderNotesChange: (value: string) => void;
   onUpdateQuantity: (
     name: string,
     variant: string,
@@ -609,122 +743,170 @@ function CartPanel({
   );
 
   return (
-    <aside
-      id="meu-pedido"
-      className="rounded-2xl border border-[#8b451f]/15 bg-[#fff8ed] p-6 shadow-lg shadow-[#8b451f]/10 lg:sticky lg:top-24"
-    >
-      <h3 className="font-serif text-2xl font-bold text-[#2f5d2f]">
-        Meu Pedido
-      </h3>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="flex max-h-[94dvh] flex-col gap-0 p-0">
+        <SheetHeader>
+          <SheetTitle>Minha Cestinha</SheetTitle>
+        </SheetHeader>
 
-      {cart.length === 0 ? (
-        <p className="mt-4 text-sm leading-relaxed text-[#8b451f]/80">
-          Seu pedido ainda está vazio.
-        </p>
-      ) : (
-        <>
-          <ul className="mt-5 space-y-4">
-            {cart.map((item) => {
-              const subtotal = item.priceYen * item.quantity;
-              const itemId = getCartItemId(item.name, item.variant, item.size);
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 sm:px-5 sm:py-4">
+          {cart.length === 0 ? (
+            <p className="py-8 text-center text-sm leading-relaxed text-muted-foreground">
+              {EMPTY_BASKET_MESSAGE}
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {cart.map((item) => {
+                const subtotal = item.priceYen * item.quantity;
+                const itemId = getCartItemId(item.name, item.variant, item.size);
+                const itemImage = getProductImageForCartItem(item);
 
-              return (
-                <li
-                  key={itemId}
-                  className="rounded-xl border border-[#8b451f]/10 bg-white p-4"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-semibold text-[#2f5d2f]">
-                        {item.name}
-                      </p>
-                      <p className="mt-0.5 text-sm text-[#8b451f]">
-                        — {item.variant}
-                      </p>
-                      <p className="text-sm text-[#8b451f]/80">
-                        — {item.size}
-                      </p>
+                return (
+                  <li
+                    key={itemId}
+                    className="flex gap-3 rounded-xl border border-border bg-card p-3"
+                  >
+                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-background">
+                      <Image
+                        src={itemImage}
+                        alt={item.name}
+                        width={64}
+                        height={64}
+                        className="size-full object-cover"
+                      />
                     </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onRemove(item.name, item.variant, item.size)
-                      }
-                      aria-label={`Remover ${item.name} ${item.variant} ${item.size}`}
-                      className="shrink-0 text-xs font-medium text-[#8b451f]/60 transition hover:text-[#8b451f]"
-                    >
-                      remover
-                    </button>
-                  </div>
 
-                  <p className="mt-1 text-xs text-[#8b451f]/70">
-                    Unitário: {formatYen(item.priceYen)}
-                  </p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold leading-snug text-foreground">
+                            {item.name}
+                          </p>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            <Badge variant="outline" className="text-[10px]">
+                              {item.variant}
+                            </Badge>
+                            <Badge variant="muted" className="text-[10px]">
+                              {item.size}
+                            </Badge>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-auto shrink-0 px-2 py-1 text-xs text-muted-foreground"
+                          onClick={() =>
+                            onRemove(item.name, item.variant, item.size)
+                          }
+                        >
+                          remover
+                        </Button>
+                      </div>
 
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <QuantitySelector
-                      quantity={item.quantity}
-                      onDecrease={() =>
-                        onUpdateQuantity(
-                          item.name,
-                          item.variant,
-                          item.size,
-                          item.quantity - 1,
-                        )
-                      }
-                      onIncrease={() =>
-                        onUpdateQuantity(
-                          item.name,
-                          item.variant,
-                          item.size,
-                          item.quantity + 1,
-                        )
-                      }
-                    />
-                    <p className="text-sm font-bold text-[#2f5d2f]">
-                      {formatYen(subtotal)}
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                      <div className="mt-2 flex items-center justify-between gap-3">
+                        <QuantitySelector
+                          quantity={item.quantity}
+                          onDecrease={() =>
+                            onUpdateQuantity(
+                              item.name,
+                              item.variant,
+                              item.size,
+                              item.quantity - 1,
+                            )
+                          }
+                          onIncrease={() =>
+                            onUpdateQuantity(
+                              item.name,
+                              item.variant,
+                              item.size,
+                              item.quantity + 1,
+                            )
+                          }
+                        />
+                        <p className="text-sm font-bold tabular-nums text-foreground">
+                          {formatYen(subtotal)}
+                        </p>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
 
-          <div className="mt-6 border-t border-[#8b451f]/15 pt-4">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-[#8b451f]">Total geral</span>
-              <span className="font-serif text-xl font-bold text-[#2f5d2f]">
+          <div className="mt-4">
+            <label
+              htmlFor="order-notes"
+              className="mb-1.5 block text-sm font-semibold text-muted-foreground"
+            >
+              Alguma observação pro seu pedido?
+            </label>
+            <Textarea
+              id="order-notes"
+              value={orderNotes}
+              onChange={(event) => onOrderNotesChange(event.target.value)}
+              placeholder="Ex: entregar após as 18h, separar para presente..."
+              rows={3}
+            />
+          </div>
+
+          {cart.length > 0 && (
+            <div className="mt-4 flex items-center justify-between rounded-xl bg-primary/5 px-4 py-3 ring-1 ring-primary/10">
+              <span className="font-semibold text-muted-foreground">
+                Total geral
+              </span>
+              <span className="font-serif text-xl font-bold tabular-nums text-foreground">
                 {formatYen(total)}
               </span>
             </div>
-          </div>
+          )}
+        </div>
 
-          <a
-            href={createCartWhatsAppLink(cart)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#2f5d2f] px-6 py-4 text-sm font-semibold text-[#fff8ed] shadow-md shadow-[#2f5d2f]/20 transition hover:bg-[#264d26] hover:shadow-lg active:scale-[0.98]"
-          >
-            <WhatsAppIcon className="h-5 w-5" />
-            Finalizar Pedido no WhatsApp
-          </a>
-        </>
-      )}
-    </aside>
+        {cart.length > 0 && (
+          <SheetFooter>
+            <Button className="w-full" size="lg" asChild>
+              <a
+                href={createCartWhatsAppLink(cart, orderNotes)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                📲 Fazer Pedido pelo WhatsApp
+              </a>
+            </Button>
+          </SheetFooter>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }
 
-function FloatingWhatsApp() {
+function FloatingWhatsApp({ elevated }: { elevated?: boolean }) {
   return (
     <a
       href={WHATSAPP_DOUBT_LINK}
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Tirar dúvida no WhatsApp"
-      className="fixed bottom-5 right-5 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-[#25D366]/90 text-white shadow-md transition hover:bg-[#25D366] hover:shadow-lg active:scale-95 sm:bottom-6 sm:right-6"
+      className={`fixed right-5 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-[#25D366]/90 text-white shadow-md transition hover:bg-[#25D366] hover:shadow-lg active:scale-95 sm:right-6 ${
+        elevated ? "bottom-20 sm:bottom-6" : "bottom-5 sm:bottom-6"
+      }`}
     >
       <WhatsAppIcon className="h-6 w-6" />
     </a>
+  );
+}
+
+function FloatingCartButton({ onOpen }: { onOpen: () => void }) {
+  return (
+    <Button
+      type="button"
+      size="lg"
+      onClick={onOpen}
+      className="fixed bottom-0 left-0 right-0 z-[90] mx-auto w-full max-w-lg rounded-t-2xl rounded-b-none pb-[max(0.875rem,env(safe-area-inset-bottom))] shadow-[0_-4px_24px_rgba(47,93,47,0.28)] sm:bottom-6 sm:left-auto sm:right-6 sm:w-auto sm:max-w-none sm:rounded-full sm:pb-3.5"
+    >
+      🧺 Ver Cestinha
+    </Button>
   );
 }
 
@@ -736,7 +918,20 @@ const NAV_LINKS = [
   { label: "Contato", href: "#contato" },
 ] as const;
 
-function SiteHeader() {
+function SiteHeader({
+  cart,
+  onViewBasket,
+}: {
+  cart: CartItem[];
+  onViewBasket: () => void;
+}) {
+  const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const cartTotal = cart.reduce(
+    (sum, item) => sum + item.priceYen * item.quantity,
+    0,
+  );
+  const hasItems = cartItemCount > 0;
+
   return (
     <header className="sticky top-0 z-50 border-b border-[#8b451f]/10 bg-[#fff8ed]/95 backdrop-blur-sm">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-5 sm:h-[4.5rem] sm:gap-6">
@@ -763,12 +958,23 @@ function SiteHeader() {
           ))}
         </nav>
 
-        <a
-          href="#produtos"
-          className="shrink-0 rounded-full bg-[#2f5d2f] px-4 py-2.5 text-xs font-semibold text-white shadow-sm shadow-[#2f5d2f]/15 transition hover:bg-[#264d26] hover:shadow-md active:scale-[0.98] sm:px-5 sm:py-2.5 sm:text-sm"
-        >
-          Ver Produtos
-        </a>
+        {hasItems ? (
+          <Button
+            type="button"
+            size="sm"
+            onClick={onViewBasket}
+            aria-label={`Minha cestinha, ${cartItemCount} ${cartItemCount === 1 ? "item" : "itens"}, total ${formatYen(cartTotal)}`}
+            className="shrink-0 whitespace-nowrap text-xs sm:text-sm"
+          >
+            🧺 {cartItemCount}{" "}
+            {cartItemCount === 1 ? "item" : "itens"} •{" "}
+            <span className="tabular-nums">{formatYen(cartTotal)}</span>
+          </Button>
+        ) : (
+          <Button asChild size="sm" className="shrink-0">
+            <a href="#produtos">Ver Produtos</a>
+          </Button>
+        )}
       </div>
     </header>
   );
@@ -787,6 +993,22 @@ export default function Home() {
   const [selectedSizes, setSelectedSizes] = useState<Record<string, string>>(
     {},
   );
+  const [modalProductName, setModalProductName] = useState<string | null>(null);
+  const [isBasketOpen, setIsBasketOpen] = useState(false);
+  const [orderNotes, setOrderNotes] = useState("");
+
+  const modalProduct = modalProductName
+    ? getCatalogProduct(modalProductName) ?? null
+    : null;
+
+  const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const showFloatingCartButton =
+    cartItemCount > 0 && !isBasketOpen && !modalProductName;
+
+  function openBasketDrawer() {
+    setModalProductName(null);
+    setIsBasketOpen(true);
+  }
 
   function getSelectedVariant(
     productName: string,
@@ -882,15 +1104,21 @@ export default function Home() {
     );
   }
 
+  function handleViewBasketFromHeader() {
+    openBasketDrawer();
+  }
+
   return (
-    <main className="min-h-screen bg-[#fff8ed] text-[#2f5d2f]">
-      <SiteHeader />
+    <main
+      className={`min-h-screen bg-[#fff8ed] text-[#2f5d2f] ${showFloatingCartButton ? "pb-20 sm:pb-24" : ""}`}
+    >
+      <SiteHeader cart={cart} onViewBasket={handleViewBasketFromHeader} />
 
       {/* ── Seção 1: Hero Premium ── */}
       <section className="relative flex min-h-[92vh] items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
           <Image
-            src="/images/gelato1.jpg"
+            src={IMAGES.gelato}
             alt=""
             fill
             priority
@@ -961,7 +1189,7 @@ export default function Home() {
 
           <div className="relative aspect-[4/3] overflow-hidden rounded-3xl shadow-2xl shadow-[#8b451f]/15">
             <Image
-              src="/images/doce-leite1.jpg"
+              src={IMAGES.doceLeite.tradicional}
               alt="Doce de leite artesanal Made in Roça"
               width={800}
               height={600}
@@ -982,9 +1210,7 @@ export default function Home() {
             description="Preparados em pequenos lotes, com receitas de família e ingredientes selecionados."
           />
 
-          <div className="lg:grid lg:grid-cols-3 lg:items-start lg:gap-8">
-            {/* Lista de produtos */}
-            <div className="space-y-14 sm:space-y-20 lg:col-span-2">
+          <div className="space-y-14 sm:space-y-20">
               {productCategories.map((category) => (
                 <div key={category.title}>
                   <h3 className="mb-6 flex items-center gap-3 font-serif text-2xl font-bold text-[#2f5d2f] sm:text-3xl">
@@ -994,9 +1220,13 @@ export default function Home() {
 
                   <div
                     className={`grid gap-6 ${
-                      category.products.length > 1
-                        ? "sm:grid-cols-2"
-                        : "max-w-lg"
+                      category.products.some(
+                        (p) => p.name === "Doce de Leite Artesanal",
+                      )
+                        ? "w-full max-w-5xl"
+                        : category.products.length > 1
+                          ? "sm:grid-cols-2"
+                          : "max-w-lg"
                     }`}
                   >
                     {category.products.map((product) => (
@@ -1007,36 +1237,12 @@ export default function Home() {
                         description={product.description}
                         variants={product.variants}
                         sizes={product.sizes}
-                        selectedVariant={getSelectedVariant(
-                          product.name,
-                          product.variants,
-                        )}
-                        selectedSize={getSelectedSize(
-                          product.name,
-                          product.sizes,
-                        )}
-                        onVariantChange={(variantName) =>
-                          selectVariant(product.name, variantName)
-                        }
-                        onSizeChange={(sizeLabel) =>
-                          selectSize(product.name, sizeLabel)
-                        }
-                        onAddToCart={addToCart}
+                        onOpenOptions={() => setModalProductName(product.name)}
                       />
                     ))}
                   </div>
                 </div>
               ))}
-            </div>
-
-            {/* Meu Pedido — abaixo no mobile, ao lado no desktop */}
-            <div className="mt-10 lg:mt-0">
-              <CartPanel
-                cart={cart}
-                onUpdateQuantity={updateCartQuantity}
-                onRemove={removeFromCart}
-              />
-            </div>
           </div>
         </div>
       </section>
@@ -1154,12 +1360,22 @@ export default function Home() {
           <p className="mt-4 text-base text-[#8b451f]/80 sm:text-lg">
             Monte seu pedido e finalize pelo WhatsApp quando estiver pronto.
           </p>
-          <a
-            href="#meu-pedido"
-            className="mt-10 inline-flex items-center rounded-full bg-[#2f5d2f] px-10 py-5 text-base font-semibold text-[#fff8ed] shadow-lg shadow-[#2f5d2f]/20 transition hover:bg-[#264d26] hover:shadow-xl active:scale-[0.98]"
-          >
-            Ver Meu Pedido
-          </a>
+          {cartItemCount > 0 ? (
+            <button
+              type="button"
+              onClick={openBasketDrawer}
+              className="mt-10 inline-flex items-center rounded-full bg-[#2f5d2f] px-10 py-5 text-base font-semibold text-[#fff8ed] shadow-lg shadow-[#2f5d2f]/20 transition hover:bg-[#264d26] hover:shadow-xl active:scale-[0.98]"
+            >
+              🧺 Ver Cestinha
+            </button>
+          ) : (
+            <a
+              href="#produtos"
+              className="mt-10 inline-flex items-center rounded-full bg-[#2f5d2f] px-10 py-5 text-base font-semibold text-[#fff8ed] shadow-lg shadow-[#2f5d2f]/20 transition hover:bg-[#264d26] hover:shadow-xl active:scale-[0.98]"
+            >
+              Ver Produtos
+            </a>
+          )}
         </div>
       </section>
 
@@ -1203,8 +1419,54 @@ export default function Home() {
         </div>
       </footer>
 
-      {/* Botão flutuante discreto para dúvidas */}
-      <FloatingWhatsApp />
+      <Toaster position="top-center" richColors closeButton />
+
+      {!isBasketOpen && (
+        <FloatingWhatsApp elevated={showFloatingCartButton} />
+      )}
+
+      {showFloatingCartButton && (
+        <FloatingCartButton onOpen={openBasketDrawer} />
+      )}
+
+      {modalProduct && (
+        <ProductDrawer
+          open
+          onOpenChange={(open) => {
+            if (!open) setModalProductName(null);
+          }}
+          name={modalProduct.name}
+          image={modalProduct.image}
+          variantImages={PRODUCT_MODAL_META[modalProduct.name]?.variantImages}
+          variants={modalProduct.variants}
+          sizes={modalProduct.sizes}
+          selectedVariant={getSelectedVariant(
+            modalProduct.name,
+            modalProduct.variants,
+          )}
+          selectedSize={getSelectedSize(
+            modalProduct.name,
+            modalProduct.sizes,
+          )}
+          onVariantChange={(variantName) =>
+            selectVariant(modalProduct.name, variantName)
+          }
+          onSizeChange={(sizeLabel) =>
+            selectSize(modalProduct.name, sizeLabel)
+          }
+          onAddToCart={addToCart}
+        />
+      )}
+
+      <CartDrawer
+        open={isBasketOpen}
+        onOpenChange={setIsBasketOpen}
+        cart={cart}
+        orderNotes={orderNotes}
+        onOrderNotesChange={setOrderNotes}
+        onUpdateQuantity={updateCartQuantity}
+        onRemove={removeFromCart}
+      />
     </main>
   );
 }
