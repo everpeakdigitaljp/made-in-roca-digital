@@ -5,7 +5,7 @@ export const ADDED_TO_CART_TOAST =
 
 export const NAV_LINKS = [
   { label: "Nossa História", href: "#historia" },
-  { label: "Produtos", href: "#produtos" },
+  { label: "Cardápio", href: "/menu" },
   { label: "Como Pedir", href: "#como-pedir" },
   { label: "Depoimentos", href: "#depoimentos" },
   { label: "Contato", href: "#contato" },
