@@ -21,340 +21,47 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { Toaster } from "@/components/ui/sonner";
-
-/* ─── Constants ─────────────────────────────────────────── */
-
-const WHATSAPP_NUMBER = "819098947903";
-const WHATSAPP_DISPLAY = "090-9894-7903";
-const INSTAGRAM_HANDLE = "@madeinroca.jp";
-const INSTAGRAM_URL = "https://instagram.com/madeinroca.jp";
-
-const WHATSAPP_DOUBT_MESSAGE = "Olá Made in Roça! Gostaria de tirar uma dúvida.";
-const WHATSAPP_DOUBT_LINK = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_DOUBT_MESSAGE)}`;
-
-const IMAGES = {
-  logo: "/images/branding/logo-made-in-roca.png",
-  badge: "/images/branding/badge.png",
-  placaMadeira: "/images/branding/placa de madeira.png",
-  gelato: "/images/gelatos/gelato1.jpg",
-  porcoNaLata: "/images/porco-na-lata/porco-na-lata1.jpg",
-  torresmo: "/images/torresmo/torresmo1.jpg",
-  doceLeite: {
-    tradicional: "/images/doce-leite/doce-leite-tradicional.png",
-    coco: "/images/doce-leite/doce-leite-coco.png",
-    pacoca: "/images/doce-leite/doce-leite-paçoca.png",
-    ameixa: "/images/doce-leite/doce-leite-ameixa.png",
-  },
-} as const;
-
-/** Imagem por sabor — Doce de Leite Artesanal */
-const DOCE_LEITE_VARIANT_IMAGES: Record<string, string> = {
-  Tradicional: IMAGES.doceLeite.tradicional,
-  Coco: IMAGES.doceLeite.coco,
-  Paçoca: IMAGES.doceLeite.pacoca,
-  Ameixa: IMAGES.doceLeite.ameixa,
-};
-
-/* ─── Carrinho: tipos e funções ─────────────────────────── */
-
-type ProductVariant = {
-  name: string;
-  priceYen: number;
-};
-
-// Tamanho com preço opcional — preparado para preços diferentes por tamanho
-type ProductSizeOption = {
-  label: string;
-  priceYen?: number;
-};
-
-type CartItem = {
-  name: string;
-  variant: string;
-  size: string;
-  priceYen: number;
-  quantity: number;
-};
-
-// Identificador único: produto + variante + tamanho
-function getCartItemId(name: string, variant: string, size: string) {
-  return `${name}::${variant}::${size}`;
-}
-
-function formatYen(value: number) {
-  return `¥${value.toLocaleString()}`;
-}
-
-// Preço final: usa preço do tamanho se definido, senão preço base da variante
-function resolveItemPrice(
-  variant: ProductVariant,
-  size: ProductSizeOption,
-): number {
-  return size.priceYen ?? variant.priceYen;
-}
-
-const productCategories = [
-  {
-    emoji: "🍮",
-    title: "Doces da Fazenda",
-    products: [
-      {
-        name: "Doce de Leite Artesanal",
-        image: IMAGES.doceLeite.tradicional,
-        description:
-          "Cremoso e delicado, cozido lentamente no tacho de cobre. O sabor autêntico da roça brasileira.",
-        variants: [
-          { name: "Tradicional", priceYen: 450 },
-          { name: "Coco", priceYen: 450 },
-          { name: "Paçoca", priceYen: 450 },
-          { name: "Ameixa", priceYen: 450 },
-        ],
-        sizes: [{ label: "150ml" }, { label: "180ml" }, { label: "240ml" }],
-      },
-    ],
-  },
-  {
-    emoji: "🍨",
-    title: "Gelatos Artesanais",
-    products: [
-      {
-        name: "Gelato Artesanal",
-        image: IMAGES.gelato,
-        description:
-          "Gelato cremoso com sabores brasileiros. Produzido em pequenos lotes, com ingredientes naturais.",
-        variants: [
-          { name: "Milho Verde", priceYen: 500 },
-          { name: "Coco", priceYen: 500 },
-          { name: "Limão", priceYen: 500 },
-          { name: "Abacate", priceYen: 500 },
-          { name: "Açaí", priceYen: 500 },
-          { name: "Doce de Leite", priceYen: 500 },
-        ],
-        sizes: [{ label: "180ml" }, { label: "240ml" }],
-      },
-    ],
-  },
-  {
-    emoji: "🥓",
-    title: "Especialidades Caipiras",
-    products: [
-      {
-        name: "Porco na Lata",
-        image: IMAGES.porcoNaLata,
-        description:
-          "Conserva artesanal de carne suína desfiada, temperada com especiarias caipiras.",
-        variants: [{ name: "Tradicional", priceYen: 1800 }],
-        sizes: [{ label: "500g" }, { label: "1kg" }],
-      },
-      {
-        name: "Torresmo Caipira",
-        image: IMAGES.torresmo,
-        description:
-          "Torresmo crocante feito na panela de ferro, com sal grosso e tempero de fazenda.",
-        variants: [{ name: "Semi pronto congelado", priceYen: 900 }],
-        sizes: [{ label: "500g" }, { label: "1kg" }],
-      },
-    ],
-  },
-] as const;
-
-type CatalogProduct = (typeof productCategories)[number]["products"][number];
-
-function getCatalogProduct(productName: string): CatalogProduct | undefined {
-  for (const category of productCategories) {
-    const product = category.products.find((item) => item.name === productName);
-    if (product) return product;
-  }
-  return undefined;
-}
-
-const DOCE_LEITE_EXPERIENCE = {
-  story:
-    "Cozido lentamente no tacho de cobre, como nas fazendas do interior. Cada pote guarda o sabor acolhedor da infância e a tradição da roça brasileira.",
-} as const;
-
-type ProductModalMeta = {
-  story?: string;
-  variantImages?: Record<string, string>;
-};
-
-const PRODUCT_MODAL_META: Record<string, ProductModalMeta> = {
-  "Doce de Leite Artesanal": {
-    story: DOCE_LEITE_EXPERIENCE.story,
-    variantImages: DOCE_LEITE_VARIANT_IMAGES,
-  },
-};
-
-function getStartingPrice(
-  variants: readonly ProductVariant[],
-  sizes: readonly ProductSizeOption[],
-) {
-  return Math.min(
-    ...variants.flatMap((variant) =>
-      sizes.map((size) => resolveItemPrice(variant, size)),
-    ),
-  );
-}
-
-function resolveVariantImage(
-  defaultImage: string,
-  variantName: string,
-  variantImages?: Record<string, string>,
-) {
-  return variantImages?.[variantName] ?? defaultImage;
-}
-
-/* ─── WhatsApp: mensagem agrupada por produto ───────────── */
-
-type ProductCatalogEntry = {
-  emoji: string;
-  order: number;
-};
-
-// Mapa produto → emoji e ordem de exibição na mensagem
-const PRODUCT_CATALOG: Record<string, ProductCatalogEntry> =
-  Object.fromEntries(
-    productCategories.flatMap((category, categoryIndex) =>
-      category.products.map((product, productIndex) => [
-        product.name,
-        {
-          emoji: category.emoji,
-          order: categoryIndex * 100 + productIndex,
-        },
-      ]),
-    ),
-  );
-
-function formatQuantityLabel(quantity: number) {
-  return quantity === 1 ? "1 unidade" : `${quantity} unidades`;
-}
-
-// Monta rótulo da variante + tamanho para carrinho e WhatsApp
-function formatVariantLabel(item: CartItem) {
-  return `${item.variant} · ${item.size}`;
-}
-
-function formatCartLineItem(item: CartItem) {
-  const lineSubtotal = item.priceYen * item.quantity;
-  return `• ${formatVariantLabel(item)} — ${formatQuantityLabel(item.quantity)} — ${formatYen(lineSubtotal)}`;
-}
-
-function groupCartByProduct(cart: CartItem[]) {
-  const groups = new Map<string, CartItem[]>();
-
-  for (const item of cart) {
-    const existing = groups.get(item.name) ?? [];
-    existing.push(item);
-    groups.set(item.name, existing);
-  }
-
-  return Array.from(groups.entries()).sort(([nameA], [nameB]) => {
-    const orderA = PRODUCT_CATALOG[nameA]?.order ?? 999;
-    const orderB = PRODUCT_CATALOG[nameB]?.order ?? 999;
-    return orderA - orderB;
-  });
-}
-
-function formatProductGroup(productName: string, items: CartItem[]) {
-  const emoji = PRODUCT_CATALOG[productName]?.emoji ?? "🛒";
-  const groupSubtotal = items.reduce(
-    (sum, item) => sum + item.priceYen * item.quantity,
-    0,
-  );
-
-  const lines = items.map(formatCartLineItem).join("\n");
-
-  return `${emoji} ${productName}\n\n${lines}\n\nSubtotal: ${formatYen(groupSubtotal)}`;
-}
-
-function buildWhatsAppOrderMessage(cart: CartItem[], notes?: string) {
-  const groupsText = groupCartByProduct(cart)
-    .map(([productName, items]) => formatProductGroup(productName, items))
-    .join("\n\n");
-
-  const total = cart.reduce(
-    (sum, item) => sum + item.priceYen * item.quantity,
-    0,
-  );
-
-  const trimmedNotes = notes?.trim();
-  const notesBlock = trimmedNotes
-    ? `\n\nObservações:\n${trimmedNotes}`
-    : "";
-
-  return `Olá Made in Roça!
-Gostaria de fazer este pedido:
-
-${groupsText}
-
-Total: ${formatYen(total)}${notesBlock}`;
-}
-
-function createCartWhatsAppLink(cart: CartItem[], notes?: string) {
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(buildWhatsAppOrderMessage(cart, notes))}`;
-}
-
-function getProductImageForCartItem(item: CartItem) {
-  const product = getCatalogProduct(item.name);
-  if (!product) return IMAGES.logo;
-  return resolveVariantImage(
-    product.image,
-    item.variant,
-    PRODUCT_MODAL_META[item.name]?.variantImages,
-  );
-}
-
-const flavors = [
-  {
-    name: "Tradicional",
-    description: "Doce de leite puro, cremoso e intenso — o clássico da roça.",
-  },
-  {
-    name: "Coco",
-    description: "A combinação perfeita de coco fresco com doce de leite.",
-  },
-  {
-    name: "Paçoca",
-    description: "Amendoim torrado e doce de leite em harmonia irresistível.",
-  },
-  {
-    name: "Ameixa",
-    description: "Ameixa seca macia que contrasta com a cremosidade do doce.",
-  },
-] as const;
-
-const steps = [
-  {
-    icon: "🛒",
-    title: "Escolha seus produtos",
-    description: "Navegue pelo nosso cardápio e selecione seus favoritos.",
-  },
-  {
-    icon: "💬",
-    title: "Envie seu pedido pelo WhatsApp",
-    description: "Fale conosco diretamente e confirme seu pedido com facilidade.",
-  },
-  {
-    icon: "🏠",
-    title: "Receba em casa ou retire",
-    description: "Entregamos com carinho ou você pode retirar no local.",
-  },
-] as const;
-
-const testimonials = [
-  {
-    quote: "Me lembrou os doces da minha infância.",
-    author: "Maria S.",
-  },
-  {
-    quote: "Sabor incrível e atendimento excelente.",
-    author: "Carlos T.",
-  },
-  {
-    quote: "Os gelatos são maravilhosos.",
-    author: "Ana L.",
-  },
-] as const;
+import {
+  IMAGES,
+  INSTAGRAM_HANDLE,
+  INSTAGRAM_URL,
+  WHATSAPP_DISPLAY,
+  WHATSAPP_DOUBT_LINK,
+} from "@/branding/assets";
+import {
+  ADDED_TO_CART_TOAST,
+  EMPTY_BASKET_MESSAGE,
+  NAV_LINKS,
+  ORDER_NOTES_PLACEHOLDER,
+  ORDER_STEPS,
+  TESTIMONIALS,
+} from "@/branding/copy";
+import {
+  flavorShowcase,
+  getCatalogProduct,
+  PRODUCT_MODAL_META,
+  productCategories,
+} from "@/data/index";
+import {
+  getCartItemCount,
+  getCartItemId,
+  getCartTotal,
+  useCart,
+  type CartItem,
+} from "@/features/cart";
+import { useCheckout } from "@/features/checkout";
+import {
+  getProductImageForCartItem,
+  getSelectedSize,
+  getSelectedVariant,
+  getStartingPrice,
+  resolveItemPrice,
+  resolveVariantImage,
+  type ProductSizeOption,
+  type ProductVariant,
+} from "@/features/product";
+import { createCartWhatsAppLink } from "@/features/whatsapp";
+import { formatYen } from "@/lib/currency";
 
 /* ─── Icons ───────────────────────────────────────────────── */
 
@@ -487,8 +194,6 @@ function LogoImage({
     </div>
   );
 }
-
-const EMPTY_BASKET_MESSAGE = "Sua cestinha tá esperando um trem bão.";
 
 function ProductCard({
   name,
@@ -628,7 +333,7 @@ function ProductDrawer({
       quantity,
     );
     setQuantity(1);
-    toast("🌾 Prontim! Esse trem já tá guardado na sua cestinha.");
+    toast(ADDED_TO_CART_TOAST);
   }
 
   return (
@@ -846,7 +551,7 @@ function CartDrawer({
               id="order-notes"
               value={orderNotes}
               onChange={(event) => onOrderNotesChange(event.target.value)}
-              placeholder="Ex: entregar após as 18h, separar para presente..."
+              placeholder={ORDER_NOTES_PLACEHOLDER}
               rows={3}
             />
           </div>
@@ -910,14 +615,6 @@ function FloatingCartButton({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-const NAV_LINKS = [
-  { label: "Nossa História", href: "#historia" },
-  { label: "Produtos", href: "#produtos" },
-  { label: "Como Pedir", href: "#como-pedir" },
-  { label: "Depoimentos", href: "#depoimentos" },
-  { label: "Contato", href: "#contato" },
-] as const;
-
 function SiteHeader({
   cart,
   onViewBasket,
@@ -925,11 +622,8 @@ function SiteHeader({
   cart: CartItem[];
   onViewBasket: () => void;
 }) {
-  const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const cartTotal = cart.reduce(
-    (sum, item) => sum + item.priceYen * item.quantity,
-    0,
-  );
+  const cartItemCount = getCartItemCount(cart);
+  const cartTotal = getCartTotal(cart);
   const hasItems = cartItemCount > 0;
 
   return (
@@ -983,8 +677,9 @@ function SiteHeader({
 /* ─── Page ────────────────────────────────────────────────── */
 
 export default function Home() {
-  // Estado global do carrinho
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const { cart, addToCart, updateCartQuantity, removeFromCart, cartItemCount } =
+    useCart();
+  const { orderNotes, setOrderNotes } = useCheckout(cart);
 
   // Variante e tamanho selecionados de cada produto (chave = nome do produto)
   const [selectedVariants, setSelectedVariants] = useState<
@@ -995,33 +690,17 @@ export default function Home() {
   );
   const [modalProductName, setModalProductName] = useState<string | null>(null);
   const [isBasketOpen, setIsBasketOpen] = useState(false);
-  const [orderNotes, setOrderNotes] = useState("");
 
   const modalProduct = modalProductName
     ? getCatalogProduct(modalProductName) ?? null
     : null;
 
-  const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const showFloatingCartButton =
     cartItemCount > 0 && !isBasketOpen && !modalProductName;
 
   function openBasketDrawer() {
     setModalProductName(null);
     setIsBasketOpen(true);
-  }
-
-  function getSelectedVariant(
-    productName: string,
-    variants: readonly ProductVariant[],
-  ) {
-    return selectedVariants[productName] ?? variants[0].name;
-  }
-
-  function getSelectedSize(
-    productName: string,
-    sizes: readonly ProductSizeOption[],
-  ) {
-    return selectedSizes[productName] ?? sizes[0].label;
   }
 
   function selectVariant(productName: string, variantName: string) {
@@ -1036,72 +715,6 @@ export default function Home() {
       ...current,
       [productName]: sizeLabel,
     }));
-  }
-
-  function isSameCartItem(
-    item: CartItem,
-    name: string,
-    variant: string,
-    size: string,
-  ) {
-    return (
-      item.name === name && item.variant === variant && item.size === size
-    );
-  }
-
-  // Adiciona produto + variante + tamanho (soma se já existir a mesma combinação)
-  function addToCart(
-    name: string,
-    variant: string,
-    size: string,
-    priceYen: number,
-    quantity: number,
-  ) {
-    setCart((current) => {
-      const existing = current.find((item) =>
-        isSameCartItem(item, name, variant, size),
-      );
-
-      if (existing) {
-        return current.map((item) =>
-          isSameCartItem(item, name, variant, size)
-            ? { ...item, quantity: item.quantity + quantity }
-            : item,
-        );
-      }
-
-      return [...current, { name, variant, size, priceYen, quantity }];
-    });
-  }
-
-  // Atualiza quantidade no carrinho (remove se chegar a 0)
-  function updateCartQuantity(
-    name: string,
-    variant: string,
-    size: string,
-    quantity: number,
-  ) {
-    if (quantity <= 0) {
-      removeFromCart(name, variant, size);
-      return;
-    }
-
-    setCart((current) =>
-      current.map((item) =>
-        isSameCartItem(item, name, variant, size)
-          ? { ...item, quantity }
-          : item,
-      ),
-    );
-  }
-
-  // Remove produto + variante + tamanho do carrinho
-  function removeFromCart(name: string, variant: string, size: string) {
-    setCart((current) =>
-      current.filter(
-        (item) => !isSameCartItem(item, name, variant, size),
-      ),
-    );
   }
 
   function handleViewBasketFromHeader() {
@@ -1257,7 +870,7 @@ export default function Home() {
           />
 
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {flavors.map((flavor) => (
+            {flavorShowcase.map((flavor) => (
               <div
                 key={flavor.name}
                 className="group rounded-2xl border border-[#8b451f]/10 bg-white p-6 text-center shadow-sm transition duration-300 hover:-translate-y-1 hover:border-[#d4af37]/40 hover:shadow-lg"
@@ -1290,7 +903,7 @@ export default function Home() {
           </div>
 
           <div className="grid gap-8 sm:grid-cols-3 sm:gap-6">
-            {steps.map((step, index) => (
+            {ORDER_STEPS.map((step, index) => (
               <div
                 key={step.title}
                 className="relative rounded-2xl border border-[#fff8ed]/10 bg-[#fff8ed]/5 p-8 text-center backdrop-blur-sm"
@@ -1323,7 +936,7 @@ export default function Home() {
           />
 
           <div className="grid gap-6 sm:grid-cols-3">
-            {testimonials.map((item) => (
+            {TESTIMONIALS.map((item) => (
               <blockquote
                 key={item.author}
                 className="flex flex-col rounded-2xl border border-[#8b451f]/10 bg-white p-6 shadow-sm"
@@ -1443,10 +1056,12 @@ export default function Home() {
           selectedVariant={getSelectedVariant(
             modalProduct.name,
             modalProduct.variants,
+            selectedVariants,
           )}
           selectedSize={getSelectedSize(
             modalProduct.name,
             modalProduct.sizes,
+            selectedSizes,
           )}
           onVariantChange={(variantName) =>
             selectVariant(modalProduct.name, variantName)
